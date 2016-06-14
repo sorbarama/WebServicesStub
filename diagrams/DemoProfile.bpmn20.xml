@@ -1,0 +1,259 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:activiti="http://activiti.org/bpmn" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:omgdc="http://www.omg.org/spec/DD/20100524/DC" xmlns:omgdi="http://www.omg.org/spec/DD/20100524/DI" typeLanguage="http://www.w3.org/2001/XMLSchema" expressionLanguage="http://www.w3.org/1999/XPath" targetNamespace="http://activiti.org/test">
+    <collaboration id="Collaboration">
+        <participant id="poolRadioNetwork" name="Radio Network" processRef="process"></participant>
+    </collaboration>
+    <process id="process" name="Radio Network" isExecutable="true" processType="Public">
+        <laneSet id="laneSet_process">
+            <lane id="laneActivation" name="Activation">
+                <flowNodeRef>flow25</flowNodeRef>
+                <flowNodeRef>flow26</flowNodeRef>
+                <flowNodeRef>flow27</flowNodeRef>
+                <flowNodeRef>flow28</flowNodeRef>
+                <flowNodeRef>startDemo</flowNodeRef>
+                <flowNodeRef>scriptTaskActivateGateway</flowNodeRef>
+                <flowNodeRef>exclusivegatewayActivation</flowNodeRef>
+            </lane>
+            <lane id="lanePollingAdjustements" name="Polling Adjustments">
+                <flowNodeRef>flow31</flowNodeRef>
+                <flowNodeRef>endPollingAdjustements</flowNodeRef>
+                <flowNodeRef>exclusivegatewayPollingAdjustements</flowNodeRef>
+                <flowNodeRef>scriptTaskReadCAPMessages</flowNodeRef>
+                <flowNodeRef>scripttaskChangePeriod</flowNodeRef>
+            </lane>
+        </laneSet>
+        <startEvent id="startDemo" name="Start"></startEvent>
+        <scriptTask id="scriptTaskActivateGateway" name="Activate Gateway" scriptFormat="groovy" activiti:autoStoreVariables="false">
+            <script>
+                import groovy.json.*
+                import java.lang.String
+                import it.lutech.c2sense.pee.invoker.*
+
+                /* ****************************
+                1. call for read alla data
+                **************************** */
+                def serviceId = 'VAR_SERVICE_NAME;none'
+                def serviceMethod = 'VAR_URI;http://localhost:8080/pee/ws/PeeWS'
+
+                def params = new String[5]
+                params[0] = 'VAR_WSDL_URI;http://localhost:8080/pee/ws/PeeWS?wsdl'
+                params[1] = 'VAR_BINDING;PeeWSImplPortBinding'
+                params[2] = 'VAR_OPERATION;restProxy'
+                params[3] = 'VARS_NAME;arg0'
+                params[4] = 'VARS_VALUE;uri#method$http://c2sense.piap.pl/ipgw/info#GET'
+
+                Invoker invoker = new SOAPInvokerImpl()
+                def response = invoker.run(serviceId, serviceMethod, params)
+
+                def start = response.indexOf('return') + 7
+                def end = response.indexOf('return', start) - 2
+                def jsonString = response.substring(start, end)
+
+                def jsonObject = new JsonSlurper().parseText(jsonString)
+                def activeValue = 'true'
+                jsonObject.each {
+                if(it.mute) {
+                /* ****************************
+                2. put on single sensor with low period (60)
+                **************************** */
+                activeValue = 'false'
+                params[3] = 'VARS_NAME;arg0'
+                params[4] = 'VARS_VALUE;uri#method#body$http://c2sense.piap.pl/ipgw/byid/' + it.id + '#PUT#{"period":"P60S","mute":"False"}'
+                response = invoker.run(serviceId, serviceMethod, params)
+                }
+                }
+                if(activeValue == 'false') {
+                sleep(5000)
+                }
+                execution.setVariable("varActive", activeValue)
+            </script>
+        </scriptTask>
+        <exclusiveGateway id="exclusivegatewayActivation" name="EG Activation"></exclusiveGateway>
+        <scriptTask id="scriptTaskReadCAPMessages" name="Read CAP Messages" scriptFormat="groovy" activiti:autoStoreVariables="false">
+            <script>
+                import groovy.json.*
+                import java.lang.String
+                import it.lutech.c2sense.pee.invoker.*
+
+                def serviceId = 'VAR_SERVICE_NAME;none'
+                def serviceMethod = "VAR_URI;http://c2sense-ie2.zapto.org/c2sesb/service_manager/"
+
+                def params = new String[5];
+                params[0] = "VAR_WSDL_URI;http://c2sense-ie2.zapto.org/c2sesb/service_manager/?wsdl"
+                params[1] = "VAR_BINDING;Application"
+                params[2] = "VAR_OPERATION;getMessagesFromGroup"
+                params[3] = 'VARS_NAME;c2s:lenght|c2s:topic_id|c2s:group_id'
+                params[4] = 'VARS_VALUE;-1|rule-46826|max'
+
+                Invoker invoker = new SOAPInvokerImpl()
+                def response = invoker.run(serviceId, serviceMethod, params)
+
+                def varPeriod = '60'
+                def start = response.indexOf('s0:message_list') + 16
+                def end = response.indexOf('s0:message_list', start) - 2
+                if(end > 0) {
+                def messageListItem = response.substring(start, end)
+
+                def numItems = (messageListItem =~ /s0:MessageListItem/).count
+                if (numItems > 0){
+                varPeriod = '-60'
+                }
+                }
+
+                execution.setVariable("varPeriod", varPeriod)
+            </script>
+        </scriptTask>
+        <endEvent id="endPollingAdjustements"></endEvent>
+        <exclusiveGateway id="exclusivegatewayPollingAdjustements" name="EG Polling Adjustements"></exclusiveGateway>
+        <sequenceFlow id="flow25" sourceRef="startDemo" targetRef="scriptTaskActivateGateway"></sequenceFlow>
+        <sequenceFlow id="flow26" sourceRef="scriptTaskActivateGateway" targetRef="exclusivegatewayActivation"></sequenceFlow>
+        <sequenceFlow id="flow27" name="Active" sourceRef="exclusivegatewayActivation" targetRef="scriptTaskReadCAPMessages">
+            <conditionExpression xsi:type="tFormalExpression"><![CDATA[${varActive == "true"}]]></conditionExpression>
+        </sequenceFlow>
+        <sequenceFlow id="flow28" name="Not Active" sourceRef="exclusivegatewayActivation" targetRef="scriptTaskActivateGateway">
+            <conditionExpression xsi:type="tFormalExpression"><![CDATA[${varActive == "false"}]]></conditionExpression>
+        </sequenceFlow>
+        <sequenceFlow id="flow31" name="End" sourceRef="exclusivegatewayPollingAdjustements" targetRef="endPollingAdjustements">
+            <conditionExpression xsi:type="tFormalExpression"><![CDATA[${varPeriod >= 600 || varPeriod <= 0}]]></conditionExpression>
+        </sequenceFlow>
+        <sequenceFlow id="flow34" sourceRef="exclusivegatewayPollingAdjustements" targetRef="scriptTaskReadCAPMessages">
+            <conditionExpression xsi:type="tFormalExpression"><![CDATA[${varPeriod < 600 && varPeriod > 0}]]></conditionExpression>
+        </sequenceFlow>
+        <scriptTask id="scripttaskChangePeriod" name="Change Period" scriptFormat="groovy" activiti:autoStoreVariables="false">
+            <script>
+                import groovy.json.*
+                import java.lang.String
+                import it.lutech.c2sense.pee.invoker.*
+
+                /* ****************************
+                1. call for read alla data
+                **************************** */
+                def serviceId = 'VAR_SERVICE_NAME;none'
+                def serviceMethod = 'VAR_URI;http://localhost:8080/pee/ws/PeeWS'
+
+                def params = new String[5]
+                params[0] = 'VAR_WSDL_URI;http://localhost:8080/pee/ws/PeeWS?wsdl'
+                params[1] = 'VAR_BINDING;PeeWSImplPortBinding'
+                params[2] = 'VAR_OPERATION;restProxy'
+                params[3] = 'VARS_NAME;arg0'
+                params[4] = 'VARS_VALUE;uri#method$http://c2sense.piap.pl/ipgw/info#GET'
+
+                Invoker invoker = new SOAPInvokerImpl()
+                def response = invoker.run(serviceId, serviceMethod, params)
+
+                def start = response.indexOf('return') + 7
+                def end = response.indexOf('return', start) - 2
+                def jsonString = response.substring(start, end)
+
+                def jsonObject = new JsonSlurper().parseText(jsonString)
+                def maxPeriod = 0
+                def tempPeriod
+                jsonObject.each {
+                tempPeriod = it.period.toInteger()
+                if(tempPeriod > maxPeriod) {
+                maxPeriod = tempPeriod
+                }
+                }
+
+                /* ****************************
+                2. change all sensor with new value
+                **************************** */
+                maxPeriod = maxPeriod + execution.getVariable("varPeriod").toInteger()
+                if(maxPeriod == 0){
+                    maxPeriod = 10
+                }
+                params[3] = 'VARS_NAME;arg0'
+                params[4] = 'VARS_VALUE;uri#method#body$http://c2sense.piap.pl/ipgw/all#PUT#{"period":"P' + maxPeriod + 'S","mute":"False"}'
+                response = invoker.run(serviceId, serviceMethod, params)
+
+                //wait 10 secs
+                sleep(10000)
+
+                execution.setVariable("varPeriod", maxPeriod)
+            </script>
+        </scriptTask>
+        <sequenceFlow id="flow35" sourceRef="scriptTaskReadCAPMessages" targetRef="scripttaskChangePeriod"></sequenceFlow>
+        <sequenceFlow id="flow36" sourceRef="scripttaskChangePeriod" targetRef="exclusivegatewayPollingAdjustements"></sequenceFlow>
+    </process>
+    <bpmndi:BPMNDiagram id="BPMNDiagram_Collaboration">
+        <bpmndi:BPMNPlane bpmnElement="Collaboration" id="BPMNPlane_Collaboration">
+            <bpmndi:BPMNShape bpmnElement="poolRadioNetwork" id="BPMNShape_poolRadioNetwork">
+                <omgdc:Bounds height="447.0" width="821.0" x="14.0" y="164.0"></omgdc:Bounds>
+            </bpmndi:BPMNShape>
+            <bpmndi:BPMNShape bpmnElement="laneActivation" id="BPMNShape_laneActivation">
+                <omgdc:Bounds height="189.0" width="791.0" x="44.0" y="164.0"></omgdc:Bounds>
+            </bpmndi:BPMNShape>
+            <bpmndi:BPMNShape bpmnElement="lanePollingAdjustements" id="BPMNShape_lanePollingAdjustements">
+                <omgdc:Bounds height="258.0" width="791.0" x="44.0" y="353.0"></omgdc:Bounds>
+            </bpmndi:BPMNShape>
+            <bpmndi:BPMNShape bpmnElement="startDemo" id="BPMNShape_startDemo">
+                <omgdc:Bounds height="35.0" width="35.0" x="121.0" y="244.0"></omgdc:Bounds>
+            </bpmndi:BPMNShape>
+            <bpmndi:BPMNShape bpmnElement="scriptTaskActivateGateway" id="BPMNShape_scriptTaskActivateGateway">
+                <omgdc:Bounds height="83.0" width="108.0" x="250.0" y="220.0"></omgdc:Bounds>
+            </bpmndi:BPMNShape>
+            <bpmndi:BPMNShape bpmnElement="exclusivegatewayActivation" id="BPMNShape_exclusivegatewayActivation">
+                <omgdc:Bounds height="40.0" width="40.0" x="450.0" y="241.0"></omgdc:Bounds>
+            </bpmndi:BPMNShape>
+            <bpmndi:BPMNShape bpmnElement="scriptTaskReadCAPMessages" id="BPMNShape_scriptTaskReadCAPMessages">
+                <omgdc:Bounds height="81.0" width="107.0" x="200.0" y="430.0"></omgdc:Bounds>
+            </bpmndi:BPMNShape>
+            <bpmndi:BPMNShape bpmnElement="endPollingAdjustements" id="BPMNShape_endPollingAdjustements">
+                <omgdc:Bounds height="35.0" width="35.0" x="600.0" y="543.0"></omgdc:Bounds>
+            </bpmndi:BPMNShape>
+            <bpmndi:BPMNShape bpmnElement="exclusivegatewayPollingAdjustements" id="BPMNShape_exclusivegatewayPollingAdjustements">
+                <omgdc:Bounds height="40.0" width="40.0" x="430.0" y="540.0"></omgdc:Bounds>
+            </bpmndi:BPMNShape>
+            <bpmndi:BPMNShape bpmnElement="scripttaskChangePeriod" id="BPMNShape_scripttaskChangePeriod">
+                <omgdc:Bounds height="55.0" width="105.0" x="398.0" y="443.0"></omgdc:Bounds>
+            </bpmndi:BPMNShape>
+            <bpmndi:BPMNEdge bpmnElement="flow25" id="BPMNEdge_flow25">
+                <omgdi:waypoint x="156.0" y="261.0"></omgdi:waypoint>
+                <omgdi:waypoint x="250.0" y="261.0"></omgdi:waypoint>
+            </bpmndi:BPMNEdge>
+            <bpmndi:BPMNEdge bpmnElement="flow26" id="BPMNEdge_flow26">
+                <omgdi:waypoint x="358.0" y="261.0"></omgdi:waypoint>
+                <omgdi:waypoint x="450.0" y="261.0"></omgdi:waypoint>
+            </bpmndi:BPMNEdge>
+            <bpmndi:BPMNEdge bpmnElement="flow27" id="BPMNEdge_flow27">
+                <omgdi:waypoint x="470.0" y="281.0"></omgdi:waypoint>
+                <omgdi:waypoint x="469.0" y="379.0"></omgdi:waypoint>
+                <omgdi:waypoint x="138.0" y="379.0"></omgdi:waypoint>
+                <omgdi:waypoint x="138.0" y="470.0"></omgdi:waypoint>
+                <omgdi:waypoint x="200.0" y="470.0"></omgdi:waypoint>
+                <bpmndi:BPMNLabel>
+                    <omgdc:Bounds height="13.0" width="28.0" x="477.0" y="310.0"></omgdc:Bounds>
+                </bpmndi:BPMNLabel>
+            </bpmndi:BPMNEdge>
+            <bpmndi:BPMNEdge bpmnElement="flow28" id="BPMNEdge_flow28">
+                <omgdi:waypoint x="470.0" y="241.0"></omgdi:waypoint>
+                <omgdi:waypoint x="470.0" y="190.0"></omgdi:waypoint>
+                <omgdi:waypoint x="304.0" y="190.0"></omgdi:waypoint>
+                <omgdi:waypoint x="304.0" y="220.0"></omgdi:waypoint>
+                <bpmndi:BPMNLabel>
+                    <omgdc:Bounds height="13.0" width="47.0" x="471.0" y="168.0"></omgdc:Bounds>
+                </bpmndi:BPMNLabel>
+            </bpmndi:BPMNEdge>
+            <bpmndi:BPMNEdge bpmnElement="flow31" id="BPMNEdge_flow31">
+                <omgdi:waypoint x="470.0" y="560.0"></omgdi:waypoint>
+                <omgdi:waypoint x="600.0" y="560.0"></omgdi:waypoint>
+                <bpmndi:BPMNLabel>
+                    <omgdc:Bounds height="13.0" width="19.0" x="528.0" y="520.0"></omgdc:Bounds>
+                </bpmndi:BPMNLabel>
+            </bpmndi:BPMNEdge>
+            <bpmndi:BPMNEdge bpmnElement="flow34" id="BPMNEdge_flow34">
+                <omgdi:waypoint x="430.0" y="560.0"></omgdi:waypoint>
+                <omgdi:waypoint x="256.0" y="559.0"></omgdi:waypoint>
+                <omgdi:waypoint x="253.0" y="511.0"></omgdi:waypoint>
+            </bpmndi:BPMNEdge>
+            <bpmndi:BPMNEdge bpmnElement="flow35" id="BPMNEdge_flow35">
+                <omgdi:waypoint x="307.0" y="470.0"></omgdi:waypoint>
+                <omgdi:waypoint x="398.0" y="470.0"></omgdi:waypoint>
+            </bpmndi:BPMNEdge>
+            <bpmndi:BPMNEdge bpmnElement="flow36" id="BPMNEdge_flow36">
+                <omgdi:waypoint x="450.0" y="498.0"></omgdi:waypoint>
+                <omgdi:waypoint x="450.0" y="540.0"></omgdi:waypoint>
+            </bpmndi:BPMNEdge>
+        </bpmndi:BPMNPlane>
+    </bpmndi:BPMNDiagram>
+</definitions>

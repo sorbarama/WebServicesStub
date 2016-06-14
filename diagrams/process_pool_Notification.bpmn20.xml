@@ -1,0 +1,354 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:activiti="http://activiti.org/bpmn" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:omgdc="http://www.omg.org/spec/DD/20100524/DC" xmlns:omgdi="http://www.omg.org/spec/DD/20100524/DI" typeLanguage="http://www.w3.org/2001/XMLSchema" expressionLanguage="http://www.w3.org/1999/XPath" targetNamespace="http://activiti.org/test">
+  <collaboration id="Collaboration">
+    <participant id="poolNotification" name="Notifier" processRef="process_pool_Notification"/>
+    <participant id="poolAlertTrackerAndChecker" name="Measurements Checker" processRef="process_pool_AlertTrackerAndChecker"/>
+    <participant id="poolRadioNetwork" name="Radio Network" processRef="process"/>
+  </collaboration>
+  <signal id="signalStart" name="SignalStart" activiti:scope="global"/>
+  <signal id="signalAlert" name="SignalAlert" activiti:scope="global"/>
+  <process id="process_pool_Notification" name="Notifier" isExecutable="true">
+    <laneSet id="laneSet_process_pool_Notification">
+      <lane id="laneNotifier" name="Notifier">
+        <flowNodeRef>scriptTaskActivateCommunicator</flowNodeRef>
+        <flowNodeRef>endNotifier</flowNodeRef>
+        <flowNodeRef>signalstartevent3</flowNodeRef>
+        <flowNodeRef>exclusivegatewayNotifier</flowNodeRef>
+        <flowNodeRef>flow14</flowNodeRef>
+        <flowNodeRef>flow16</flowNodeRef>
+        <flowNodeRef>flow17</flowNodeRef>
+        <flowNodeRef>flow18</flowNodeRef>
+      </lane>
+    </laneSet>
+    <scriptTask id="scriptTaskActivateCommunicator" name="Activate Communicator" scriptFormat="groovy" activiti:autoStoreVariables="false">
+      <script><![CDATA[
+        import groovy.json.*
+
+        def response = "http://localhost:8080/C2SenseSampleService/activateCAP".toURL().text
+        def jsonObject = new JsonSlurper().parseText(response)
+        println(jsonObject)
+        execution.setVariable("varActivateCAP", jsonObject.activateCAP)]]></script>
+    </scriptTask>
+    <endEvent id="endNotifier"/>
+    <startEvent id="signalstartevent3" name="CheckerActivated Signal start">
+      <signalEventDefinition signalRef="signalAlert"/>
+    </startEvent>
+    <exclusiveGateway id="exclusivegatewayNotifier"/>
+    <sequenceFlow id="flow14" sourceRef="signalstartevent3" targetRef="scriptTaskActivateCommunicator"/>
+    <sequenceFlow id="flow16" sourceRef="scriptTaskActivateCommunicator" targetRef="exclusivegatewayNotifier"/>
+    <sequenceFlow id="flow17" name="Not Active" sourceRef="exclusivegatewayNotifier" targetRef="scriptTaskActivateCommunicator">
+      <conditionExpression xsi:type="tFormalExpression"><![CDATA[${varActivateCAP == "false"}]]></conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow18" name="Active" sourceRef="exclusivegatewayNotifier" targetRef="endNotifier">
+      <conditionExpression xsi:type="tFormalExpression"><![CDATA[${varActivateCAP == "true"}]]></conditionExpression>
+    </sequenceFlow>
+  </process>
+  <process id="process_pool_AlertTrackerAndChecker" name="Measurements Checker" isExecutable="true">
+    <laneSet id="laneSet_process_pool_AlertTrackerAndChecker">
+      <lane id="laneMeasurementsChecker" name="Measurements Checker">
+        <flowNodeRef>scriptTaskGetConfigurationData</flowNodeRef>
+        <flowNodeRef>exclusivegatewayMeasurementsChecker1</flowNodeRef>
+        <flowNodeRef>scriptTaskActivateChecker</flowNodeRef>
+        <flowNodeRef>endMeasurementsChecker</flowNodeRef>
+        <flowNodeRef>signalstartevent1</flowNodeRef>
+        <flowNodeRef>signalintermediatethrowevent2</flowNodeRef>
+        <flowNodeRef>exclusivegatewayMeasurementsChecker2</flowNodeRef>
+        <flowNodeRef>flow19</flowNodeRef>
+        <flowNodeRef>flow10</flowNodeRef>
+        <flowNodeRef>flow12</flowNodeRef>
+        <flowNodeRef>flow20</flowNodeRef>
+        <flowNodeRef>flow21</flowNodeRef>
+        <flowNodeRef>flow22</flowNodeRef>
+        <flowNodeRef>flow23</flowNodeRef>
+        <flowNodeRef>flow24</flowNodeRef>
+      </lane>
+    </laneSet>
+    <scriptTask id="scriptTaskGetConfigurationData" name="Get Configuration Data" scriptFormat="groovy" activiti:autoStoreVariables="false">
+      <script><![CDATA[
+        import groovy.json.*
+
+        def response = "http://localhost:8080/C2SenseSampleService/getDataConfiguration".toURL().text
+        def jsonObject = new JsonSlurper().parseText(response)
+        println(jsonObject)
+        execution.setVariable("varActivateAlert", jsonObject.activateAlert)]]></script>
+    </scriptTask>
+    <exclusiveGateway id="exclusivegatewayMeasurementsChecker1"/>
+    <scriptTask id="scriptTaskActivateChecker" name="Activate Checker" scriptFormat="groovy" activiti:autoStoreVariables="false">
+      <script><![CDATA[
+        import groovy.json.*
+
+        def response = "http://localhost:8080/C2SenseSampleService/activateAlertCheckingAndCAP".toURL().text
+        def jsonObject = new JsonSlurper().parseText(response)
+        println(jsonObject)
+        execution.setVariable("varActivateAlertCheckingAndCAP", jsonObject.activateAlertCheckingAndCAP)]]></script>
+    </scriptTask>
+    <endEvent id="endMeasurementsChecker"/>
+    <startEvent id="signalstartevent1" name="GatewayActivated Signal start">
+      <signalEventDefinition signalRef="signalStart"/>
+    </startEvent>
+    <intermediateThrowEvent id="signalintermediatethrowevent2" name="CheckerActivated">
+      <signalEventDefinition signalRef="signalAlert"/>
+    </intermediateThrowEvent>
+    <exclusiveGateway id="exclusivegatewayMeasurementsChecker2"/>
+    <sequenceFlow id="flow19" sourceRef="scriptTaskGetConfigurationData" targetRef="exclusivegatewayMeasurementsChecker1"/>
+    <sequenceFlow id="flow10" sourceRef="signalstartevent1" targetRef="scriptTaskGetConfigurationData"/>
+    <sequenceFlow id="flow12" sourceRef="signalintermediatethrowevent2" targetRef="endMeasurementsChecker"/>
+    <sequenceFlow id="flow20" name="No data avail" sourceRef="exclusivegatewayMeasurementsChecker1" targetRef="endMeasurementsChecker">
+      <conditionExpression xsi:type="tFormalExpression"><![CDATA[${varActivateAlert == "false"}]]></conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow21" sourceRef="exclusivegatewayMeasurementsChecker1" targetRef="scriptTaskActivateChecker">
+      <conditionExpression xsi:type="tFormalExpression"><![CDATA[${varActivateAlert == "true"}]]></conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow22" sourceRef="scriptTaskActivateChecker" targetRef="exclusivegatewayMeasurementsChecker2"/>
+    <sequenceFlow id="flow23" name="Active" sourceRef="exclusivegatewayMeasurementsChecker2" targetRef="signalintermediatethrowevent2">
+      <conditionExpression xsi:type="tFormalExpression"><![CDATA[${varActivateAlertCheckingAndCAP == "true"}]]></conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow24" name="Not Active" sourceRef="exclusivegatewayMeasurementsChecker2" targetRef="scriptTaskActivateChecker">
+      <conditionExpression xsi:type="tFormalExpression"><![CDATA[${varActivateAlertCheckingAndCAP == "false"}]]></conditionExpression>
+    </sequenceFlow>
+  </process>
+  <process id="process" name="Radio Network" isExecutable="true">
+    <laneSet id="laneSet_process">
+      <lane id="laneActivation" name="Activation">
+        <flowNodeRef>startDemo</flowNodeRef>
+        <flowNodeRef>scriptTaskActivateGateway</flowNodeRef>
+        <flowNodeRef>exclusivegatewayActivation</flowNodeRef>
+        <flowNodeRef>endActivation</flowNodeRef>
+        <flowNodeRef>signalintermediatethrowevent1</flowNodeRef>
+        <flowNodeRef>flow25</flowNodeRef>
+        <flowNodeRef>flow26</flowNodeRef>
+        <flowNodeRef>flow27</flowNodeRef>
+        <flowNodeRef>flow28</flowNodeRef>
+        <flowNodeRef>flow4</flowNodeRef>
+      </lane>
+      <lane id="lanePollingAdjustements" name="Polling Adjustments">
+        <flowNodeRef>scriptTaskActivateAdjustments</flowNodeRef>
+        <flowNodeRef>endPollingAdjustements</flowNodeRef>
+        <flowNodeRef>signalintermediatecatchevent1</flowNodeRef>
+        <flowNodeRef>exclusivegatewayPollingAdjustements</flowNodeRef>
+        <flowNodeRef>flow15</flowNodeRef>
+        <flowNodeRef>flow29</flowNodeRef>
+        <flowNodeRef>flow30</flowNodeRef>
+        <flowNodeRef>flow31</flowNodeRef>
+      </lane>
+    </laneSet>
+    <startEvent id="startDemo" name="Start"/>
+    <scriptTask id="scriptTaskActivateGateway" name="Activate Gateway" scriptFormat="groovy" activiti:autoStoreVariables="false">
+      <script><![CDATA[
+        import groovy.json.*
+
+        def response = "http://localhost:8080/C2SenseSampleService/activateRadio".toURL().text
+        def jsonObject = new JsonSlurper().parseText(response)
+        println(jsonObject)
+        execution.setVariable("varActive", jsonObject.active)]]></script>
+    </scriptTask>
+    <exclusiveGateway id="exclusivegatewayActivation"/>
+    <endEvent id="endActivation"/>
+    <intermediateThrowEvent id="signalintermediatethrowevent1" name="GatewayActivated">
+      <signalEventDefinition signalRef="signalStart"/>
+    </intermediateThrowEvent>
+    <scriptTask id="scriptTaskActivateAdjustments" name="Activate Adjustments" scriptFormat="groovy" activiti:autoStoreVariables="false">
+      <script><![CDATA[
+        import groovy.json.*
+
+        def response = "http://localhost:8080/C2SenseSampleService/startPolling".toURL().text
+        def jsonObject = new JsonSlurper().parseText(response)
+        println(jsonObject)]]></script>
+    </scriptTask>
+    <endEvent id="endPollingAdjustements"/>
+    <intermediateCatchEvent id="signalintermediatecatchevent1" name="CheckerActivated Signal start">
+      <signalEventDefinition signalRef="signalAlert"/>
+    </intermediateCatchEvent>
+    <exclusiveGateway id="exclusivegatewayPollingAdjustements"/>
+    <sequenceFlow id="flow25" sourceRef="startDemo" targetRef="scriptTaskActivateGateway"/>
+    <sequenceFlow id="flow26" sourceRef="scriptTaskActivateGateway" targetRef="exclusivegatewayActivation"/>
+    <sequenceFlow id="flow27" name="Active" sourceRef="exclusivegatewayActivation" targetRef="signalintermediatethrowevent1">
+      <conditionExpression xsi:type="tFormalExpression"><![CDATA[${varActive == "Active"}]]></conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow28" name="Not Active" sourceRef="exclusivegatewayActivation" targetRef="scriptTaskActivateGateway">
+      <conditionExpression xsi:type="tFormalExpression"><![CDATA[${varActive == "NonActive"}]]></conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow4" sourceRef="signalintermediatethrowevent1" targetRef="endActivation"/>
+    <sequenceFlow id="flow15" sourceRef="signalintermediatecatchevent1" targetRef="scriptTaskActivateAdjustments"/>
+    <sequenceFlow id="flow29" sourceRef="scriptTaskActivateAdjustments" targetRef="exclusivegatewayPollingAdjustements"/>
+    <sequenceFlow id="flow30" name="Not Active" sourceRef="exclusivegatewayPollingAdjustements" targetRef="scriptTaskActivateAdjustments"/>
+    <sequenceFlow id="flow31" name="Active" sourceRef="exclusivegatewayPollingAdjustements" targetRef="endPollingAdjustements"/>
+  </process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_Collaboration">
+    <bpmndi:BPMNPlane bpmnElement="Collaboration" id="BPMNPlane_Collaboration">
+      <bpmndi:BPMNShape bpmnElement="poolNotification" id="BPMNShape_poolNotification">
+        <omgdc:Bounds height="177.0" width="815.0" x="15.0" y="778.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="laneNotifier" id="BPMNShape_laneNotifier">
+        <omgdc:Bounds height="177.0" width="785.0" x="45.0" y="778.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="scriptTaskActivateCommunicator" id="BPMNShape_scriptTaskActivateCommunicator">
+        <omgdc:Bounds height="80.0" width="100.0" x="260.0" y="806.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="endNotifier" id="BPMNShape_endNotifier">
+        <omgdc:Bounds height="28.0" width="28.0" x="530.0" y="828.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="signalstartevent3" id="BPMNShape_signalstartevent3">
+        <omgdc:Bounds height="30.0" width="30.0" x="150.0" y="829.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="exclusivegatewayNotifier" id="BPMNShape_exclusivegatewayNotifier">
+        <omgdc:Bounds height="40.0" width="40.0" x="405.0" y="826.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="poolAlertTrackerAndChecker" id="BPMNShape_poolAlertTrackerAndChecker">
+        <omgdc:Bounds height="263.0" width="818.0" x="15.0" y="490.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="laneMeasurementsChecker" id="BPMNShape_laneMeasurementsChecker">
+        <omgdc:Bounds height="263.0" width="788.0" x="45.0" y="490.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="scriptTaskGetConfigurationData" id="BPMNShape_scriptTaskGetConfigurationData">
+        <omgdc:Bounds height="80.0" width="108.0" x="200.0" y="525.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="exclusivegatewayMeasurementsChecker1" id="BPMNShape_exclusivegatewayMeasurementsChecker1">
+        <omgdc:Bounds height="40.0" width="40.0" x="389.0" y="544.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="scriptTaskActivateChecker" id="BPMNShape_scriptTaskActivateChecker">
+        <omgdc:Bounds height="73.0" width="103.0" x="358.0" y="615.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="endMeasurementsChecker" id="BPMNShape_endMeasurementsChecker">
+        <omgdc:Bounds height="28.0" width="28.0" x="674.0" y="547.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="signalstartevent1" id="BPMNShape_signalstartevent1">
+        <omgdc:Bounds height="30.0" width="30.0" x="120.0" y="547.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="signalintermediatethrowevent2" id="BPMNShape_signalintermediatethrowevent2">
+        <omgdc:Bounds height="30.0" width="30.0" x="674.0" y="634.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="exclusivegatewayMeasurementsChecker2" id="BPMNShape_exclusivegatewayMeasurementsChecker2">
+        <omgdc:Bounds height="40.0" width="40.0" x="506.0" y="631.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="poolRadioNetwork" id="BPMNShape_poolRadioNetwork">
+        <omgdc:Bounds height="454.0" width="821.0" x="14.0" y="20.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="laneActivation" id="BPMNShape_laneActivation">
+        <omgdc:Bounds height="243.0" width="791.0" x="44.0" y="20.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="startDemo" id="BPMNShape_startDemo">
+        <omgdc:Bounds height="30.0" width="30.0" x="120.0" y="134.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="scriptTaskActivateGateway" id="BPMNShape_scriptTaskActivateGateway">
+        <omgdc:Bounds height="83.0" width="108.0" x="249.0" y="110.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="exclusivegatewayActivation" id="BPMNShape_exclusivegatewayActivation">
+        <omgdc:Bounds height="40.0" width="40.0" x="450.0" y="133.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="endActivation" id="BPMNShape_endActivation">
+        <omgdc:Bounds height="28.0" width="28.0" x="709.0" y="136.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="signalintermediatethrowevent1" id="BPMNShape_signalintermediatethrowevent1">
+        <omgdc:Bounds height="30.0" width="30.0" x="589.0" y="136.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="lanePollingAdjustements" id="BPMNShape_lanePollingAdjustements">
+        <omgdc:Bounds height="211.0" width="791.0" x="44.0" y="263.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="scriptTaskActivateAdjustments" id="BPMNShape_scriptTaskActivateAdjustments">
+        <omgdc:Bounds height="81.0" width="107.0" x="349.0" y="354.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="endPollingAdjustements" id="BPMNShape_endPollingAdjustements">
+        <omgdc:Bounds height="28.0" width="28.0" x="629.0" y="377.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="signalintermediatecatchevent1" id="BPMNShape_signalintermediatecatchevent1">
+        <omgdc:Bounds height="30.0" width="30.0" x="160.0" y="377.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="exclusivegatewayPollingAdjustements" id="BPMNShape_exclusivegatewayPollingAdjustements">
+        <omgdc:Bounds height="40.0" width="40.0" x="501.0" y="374.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge bpmnElement="flow17" id="BPMNEdge_flow17">
+        <omgdi:waypoint x="425.0" y="866.0"/>
+        <omgdi:waypoint x="425.0" y="928.0"/>
+        <omgdi:waypoint x="310.0" y="928.0"/>
+        <omgdi:waypoint x="310.0" y="886.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="flow28" id="BPMNEdge_flow28">
+        <omgdi:waypoint x="470.0" y="133.0"/>
+        <omgdi:waypoint x="470.0" y="54.0"/>
+        <omgdi:waypoint x="303.0" y="54.0"/>
+        <omgdi:waypoint x="303.0" y="110.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="flow18" id="BPMNEdge_flow18">
+        <omgdi:waypoint x="444.349593495935" y="845.349593495935"/>
+        <omgdi:waypoint x="530.0079023501675" y="842.4703226100784"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="flow29" id="BPMNEdge_flow29">
+        <omgdi:waypoint x="456.0" y="394.2742616033755"/>
+        <omgdi:waypoint x="501.0840336134454" y="394.0840336134454"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="flow19" id="BPMNEdge_flow19">
+        <omgdi:waypoint x="308.0" y="564.6516129032258"/>
+        <omgdi:waypoint x="389.12820512820514" y="564.1282051282051"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="flow24" id="BPMNEdge_flow24">
+        <omgdi:waypoint x="526.0" y="671.0"/>
+        <omgdi:waypoint x="526.0" y="717.0"/>
+        <omgdi:waypoint x="410.0" y="717.0"/>
+        <omgdi:waypoint x="409.77862595419845" y="688.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="flow14" id="BPMNEdge_flow14">
+        <omgdi:waypoint x="179.99857333079382" y="844.2068768735282"/>
+        <omgdi:waypoint x="260.0" y="845.3103448275862"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="flow25" id="BPMNEdge_flow25">
+        <omgdi:waypoint x="149.99833945520336" y="149.22318957522623"/>
+        <omgdi:waypoint x="249.0" y="150.69642857142858"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="flow26" id="BPMNEdge_flow26">
+        <omgdi:waypoint x="357.0" y="151.98502994011977"/>
+        <omgdi:waypoint x="450.1780415430267" y="152.8219584569733"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="flow15" id="BPMNEdge_flow15">
+        <omgdi:waypoint x="189.9990943942999" y="392.1648252131242"/>
+        <omgdi:waypoint x="349.0" y="393.91208791208794"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="flow16" id="BPMNEdge_flow16">
+        <omgdi:waypoint x="360.0" y="846.0"/>
+        <omgdi:waypoint x="405.0" y="846.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="flow27" id="BPMNEdge_flow27">
+        <omgdi:waypoint x="489.70588235294116" y="152.7058823529412"/>
+        <omgdi:waypoint x="589.001670471635" y="151.22385566460247"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="flow4" id="BPMNEdge_flow4">
+        <omgdi:waypoint x="618.9994704044343" y="150.87395403021483"/>
+        <omgdi:waypoint x="709.0004942891946" y="150.11764290513284"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="flow20" id="BPMNEdge_flow20">
+        <omgdi:waypoint x="428.78723404255317" y="563.7872340425532"/>
+        <omgdi:waypoint x="674.000809271945" y="561.1505289325597"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="flow31" id="BPMNEdge_flow31">
+        <omgdi:waypoint x="540.52" y="393.52"/>
+        <omgdi:waypoint x="629.0042308145283" y="391.34415825865915"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="flow10" id="BPMNEdge_flow10">
+        <omgdi:waypoint x="149.99523565832948" y="562.3780311510503"/>
+        <omgdi:waypoint x="200.0" y="563.6386554621848"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="flow21" id="BPMNEdge_flow21">
+        <omgdi:waypoint x="409.1136363636364" y="583.8863636363636"/>
+        <omgdi:waypoint x="409.2914285714286" y="615.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="flow22" id="BPMNEdge_flow22">
+        <omgdi:waypoint x="461.0" y="651.2789699570816"/>
+        <omgdi:waypoint x="506.0854700854701" y="651.0854700854701"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="flow12" id="BPMNEdge_flow12">
+        <omgdi:waypoint x="688.8295564590676" y="634.000968397948"/>
+        <omgdi:waypoint x="688.1590806382036" y="574.9990961619152"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="flow23" id="BPMNEdge_flow23">
+        <omgdi:waypoint x="545.7575757575758" y="650.7575757575758"/>
+        <omgdi:waypoint x="674.0011290079799" y="649.184035226896"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="flow30" id="BPMNEdge_flow30">
+        <omgdi:waypoint x="521.0" y="374.0"/>
+        <omgdi:waypoint x="521.0" y="295.0"/>
+        <omgdi:waypoint x="402.0" y="295.0"/>
+        <omgdi:waypoint x="402.2964824120603" y="354.0"/>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</definitions>
