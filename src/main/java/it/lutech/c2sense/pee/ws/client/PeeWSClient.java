@@ -13,7 +13,8 @@ import java.util.List;
 import java.util.Scanner;
 
 public class PeeWSClient {
-	
+
+    
 	public static void main(String[] args) {
 
         try {
@@ -42,38 +43,43 @@ public class PeeWSClient {
             }
 
             PeeWSProxy peeWSProxy = proxyService.getPeeWSImplPort();
+            do {
+                System.out.println("#############################");
+                System.out.println("#### Enter function:");
+                System.out.println("#### ");
+                System.out.println("#### 0) Quit");
+                System.out.println("#### 1) importProfile [ DemoProfile.bpmn20.xml ]");
+                System.out.println("#### 2) deleteProfile");
+                System.out.println("#### 3) startProfile");
+                System.out.println("#### 4) completeUserTask");
+                System.out.println("#############################");
+                System.out.println("#### ====> ");
+                input = new Scanner(System.in);
+                while(!(input.hasNext())){
+                    System.out.println("#### Invalid input. Enter (Y/N)");
+                }
+                value = input.nextInt();
 
-            System.out.println("#############################");
-            System.out.println("#### Enter function:");
-            System.out.println("#### ");
-            System.out.println("#### 1) importProfile [ DemoProfile.bpmn20.xml ]");
-            System.out.println("#### 2) deleteProfile");
-            System.out.println("#### 3) startProfile");
-            System.out.println("#### 4) completeUserTask");
-            System.out.println("#############################");
-            System.out.println("#### ====> ");
-            input = new Scanner(System.in);
-            while(!(input.hasNext())){
-                System.out.println("#### Invalid input. Enter (Y/N)");
-            }
-            value = input.nextInt();
-
-            switch (value) {
-                case 1:
-                    importProfile(peeWSProxy);
+                switch (value) {
+                    case 0:
+                        System.out.println("Bye!");
+                        break;
+                    case 1:
+                        importProfile(peeWSProxy);
+                        break;
+                    case 2:
+                        deleteProfile(peeWSProxy);
+                        break;
+                    case 3:
+                        startProfile(peeWSProxy);
+                        break;
+                case 4:
+                    completeUserTask(peeWSProxy);
                     break;
-                case 2:
-                    deleteProfile(peeWSProxy);
-                    break;
-                case 3:
-                    startProfile(peeWSProxy);
-                    break;
-			case 4:
-				completeUserTask(peeWSProxy);
-				break;
-                default:
-                    System.out.println("Invalid input [" + value + "]");
-            }
+                    default:
+                        System.out.println("Invalid input [" + value + "]");
+                }
+            } while (value != 0);
         } catch (MalformedURLException e) {
             e.printStackTrace();
         }
